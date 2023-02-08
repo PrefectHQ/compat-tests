@@ -44,7 +44,6 @@ def check_type_incompatibility(cloud_types, oss_types):
                 continue
 
             for field_name, props in oss_props.items():
-                print(f"{name}.{field_name}")
                 if field_name not in cloud_props:
                     type_issues.append(f"{name}.{field_name}")
                     continue
@@ -58,7 +57,7 @@ def test_oss_api_spelling_is_cloud_compatible(oss_schema, cloud_schema):
     oss_paths = load_schema(oss_schema, key="paths")
     errors = collect_extra_oss_paths(cloud_paths, oss_paths)
     list_of_routes = "\n".join(errors)
-    error_msg = f"The following API routes were present in OSS but not in Cloud: {list_of_routes}"
+    error_msg = f"The following API routes were present in OSS but not in Cloud: \n{list_of_routes}"
     assert not errors, error_msg
 
 
@@ -78,7 +77,7 @@ def test_oss_api_types_are_cloud_compatible(oss_schema, cloud_schema):
 
     if type_issues:
         list_of_issues = "\n".join(type_issues)
-        error_msg += f"The following API types have incompatible fields between OSS and Cloud: {list_of_issues}"
+        error_msg += f"The following API types have incompatible fields between OSS and Cloud: \n{list_of_issues}"
     assert not type_issues, error_msg
 
 
