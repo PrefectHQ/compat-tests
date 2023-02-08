@@ -31,4 +31,4 @@ def test_oss_api_spelling_is_cloud_compatible():
 
 
 if __name__ == "__main__":
-    test_oss_api_is_cloud_compatible()
+    test_oss_api_speling_is_cloud_compatible()
