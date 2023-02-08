@@ -20,7 +20,7 @@ def collect_extra_oss_paths(cloud_paths, oss_paths):
         )
         for method in path.keys():
             if cloud_endpoint not in cloud_paths:
-                if "Admin" not in path[method]["tags"]:
+                if not any(tag in ["Admin", "Root"] for tag in path[method]["tags"]):
                     errors.append(f"{method.upper()}: {cloud_endpoint}")
     return errors
 
