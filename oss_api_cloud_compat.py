@@ -21,7 +21,7 @@ def extra_oss_paths(cloud_paths, oss_paths):
     return errors
 
 
-def test_oss_api_is_cloud_compatible():
+def test_oss_api_spelling_is_cloud_compatible():
     cloud_paths = load_schema('cloud_schema.json', key='paths')
     oss_paths = load_schema('oss_schema.json', key='paths')
     errors = extra_oss_paths(cloud_paths, oss_paths)
