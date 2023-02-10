@@ -41,26 +41,38 @@ def check_path_parameter_compatibility(cloud_paths, oss_paths):
             if cloud_endpoint not in cloud_paths:
                 continue  # path existence is checked in another test
             cloud_params = cloud_paths[cloud_endpoint][method].get("parameters", [])
-            cloud_params = [p for p in cloud_params if p['name'] not in ('account_id', 'workspace_id')]
+            cloud_params = [
+                p
+                for p in cloud_params
+                if p["name"] not in ("account_id", "workspace_id", "token_cost")
+            ]
             oss_params = path[method].get("parameters", [])
 
-            # check required
-            required_cloud_params = {
-                (p["in"], p["name"]) for p in cloud_params if p["required"]
-            }
-            required_oss_params = {
-                (p["in"], p["name"]) for p in oss_params if p["required"]
-            }
-            if missing_oss := (required_cloud_params - required_oss_params):
-                missing_params = ", ".join([p[1] for p in missing_oss])
-                errors.append(
-                    f"{method.upper()}: {endpoint} missing required Cloud parameters {missing_params}"
+            # check schemas
+            cloud_params = {
+                p["name"]: (
+                    p["in"],
+                    p["required"],
+                    p["schema"]["type"],
+                    p["schema"].get("format"),
                 )
-            if missing_cloud := (required_oss_params - required_cloud_params):
-                missing_params = ", ".join([p[1] for p in missing_cloud])
-                errors.append(
-                    f"{method.upper()}: {cloud_endpoint} missing required OSS parameters {missing_params}"
+                for p in cloud_params
+            }
+            oss_params = {
+                p["name"]: (
+                    p["in"],
+                    p["required"],
+                    p["schema"]["type"],
+                    p["schema"].get("format"),
                 )
+                for p in oss_params
+            }
+
+            if cloud_params != oss_params:
+                errors.append(
+                    f"{method.upper()}: {cloud_endpoint} has parameter incompatibilities:\nCLOUD PARAMETERS:\n{cloud_params}\nOSS PARAMETERS:\n{oss_params}"
+                )
+
     return errors
 
 
