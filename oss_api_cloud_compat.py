@@ -76,6 +76,84 @@ def check_path_parameter_compatibility(cloud_paths, oss_paths):
     return errors
 
 
+def lookup_schema_ref(schema, ref):
+    if not ref:
+        return
+
+    keys = ref.split("/")
+    for key in keys:
+        if key == "#":
+            continue
+        schema = schema[key]
+    return schema
+
+
+def check_body_compatibility(cloud_schema, oss_schema):
+    cloud_paths = cloud_schema["paths"]
+    oss_paths = oss_schema["paths"]
+
+    errors = []
+    for endpoint, path in oss_paths.items():
+        cloud_endpoint = convert_oss_endpoint_to_cloud(endpoint)
+        if cloud_endpoint not in cloud_paths:
+            continue  # path existence is checked in another test
+        for method in path.keys():
+            # easier to use safe gets than handle all possible ways they could differ
+            cloud_body = cloud_paths[cloud_endpoint][method].get("requestBody", {})
+            oss_body = path[method].get("requestBody", {})
+
+            cloud_body_schema = (
+                cloud_body.get("content", {})
+                .get("application/json", {})
+                .get("schema", {})
+                .get("$ref")
+            )
+            oss_body_schema = (
+                oss_body.get("content", {})
+                .get("application/json", {})
+                .get("schema", {})
+                .get("$ref")
+            )
+
+            cloud_ref_schema = lookup_schema_ref(
+                schema=cloud_schema, ref=cloud_body_schema
+            ) or dict(type=None, properties={})
+            oss_ref_schema = lookup_schema_ref(
+                schema=oss_schema, ref=oss_body_schema
+            ) or dict(type=None, properties={})
+
+            # TODO: add sorts and filters
+            prop_gettr = lambda name, d: (
+                name,
+                d.get("type"),
+                d.get("format"),
+                d.get("default"),
+                d.get("deprecated"),
+            )
+
+            cloud_props = (
+                cloud_ref_schema["type"],
+                {
+                    prop_gettr(name, d)
+                    for name, d in cloud_ref_schema["properties"].items()
+                },
+            )
+            oss_props = (
+                oss_ref_schema["type"],
+                {
+                    prop_gettr(name, d)
+                    for name, d in oss_ref_schema["properties"].items()
+                },
+            )
+
+            if cloud_props != oss_props:
+                errors.append(
+                    f"{method.upper()}: {cloud_endpoint} has body incompatibilities:\nCLOUD BODY SCHEMA:\n{cloud_props}\nOSS BODY SCHEMA:\n{oss_props}"
+                )
+
+    return errors
+
+
 def check_type_incompatibility(cloud_types, oss_types):
     missing, type_issues = [], []
 
@@ -121,6 +199,16 @@ def test_api_path_parameters_are_compatible(oss_schema, cloud_schema):
     assert not errors, error_msg
 
 
+def test_api_request_bodies_are_compatible(oss_schema, cloud_schema):
+    "Note: this test does not test sorts or filters yet."
+    cloud_paths = load_schema(cloud_schema)
+    oss_paths = load_schema(oss_schema)
+    errors = check_body_compatibility(cloud_paths, oss_paths)
+    list_of_issues = "\n".join(errors)
+    error_msg = f"The following API endpoints have incompatible request bodies: \n{list_of_issues}"
+    assert not errors, error_msg
+
+
 def test_oss_api_types_are_cloud_compatible(oss_schema, cloud_schema):
     cloud_types = load_schema(cloud_schema, key="components")
     oss_types = load_schema(oss_schema, key="components")
@@ -159,12 +247,31 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    test_oss_api_spelling_is_cloud_compatible(
-        oss_schema=args.oss_schema_file, cloud_schema=args.cloud_schema_file
-    )
-    test_oss_api_types_are_cloud_compatible(
-        oss_schema=args.oss_schema_file, cloud_schema=args.cloud_schema_file
-    )
-    test_api_path_parameters_are_compatible(
-        oss_schema=args.oss_schema_file, cloud_schema=args.cloud_schema_file
-    )
+    excs = []
+    try:
+        test_oss_api_spelling_is_cloud_compatible(
+            oss_schema=args.oss_schema_file, cloud_schema=args.cloud_schema_file
+        )
+    except AssertionError as exc:
+        excs.append(str(exc))
+    try:
+        test_oss_api_types_are_cloud_compatible(
+            oss_schema=args.oss_schema_file, cloud_schema=args.cloud_schema_file
+        )
+    except AssertionError as exc:
+        excs.append(str(exc))
+    try:
+        test_api_path_parameters_are_compatible(
+            oss_schema=args.oss_schema_file, cloud_schema=args.cloud_schema_file
+        )
+    except AssertionError as exc:
+        excs.append(str(exc))
+    try:
+        test_api_request_bodies_are_compatible(
+            oss_schema=args.oss_schema_file, cloud_schema=args.cloud_schema_file
+        )
+    except AssertionError as exc:
+        excs.append(str(exc))
+
+    if excs:
+        raise Exception("\n".join(excs))
