@@ -1,6 +1,22 @@
 import argparse
 import json
+import pytest
 import sys
+
+
+@pytest.fixture
+def oss_schema():
+    return "oss_schema.json"
+
+
+@pytest.fixture
+def cloud_schema():
+    return "cloud_schema.json"
+
+
+@pytest.fixture
+def cloud_paths():
+    return load_schema("cloud_schema.json", key="paths")
 
 
 def load_schema(fpath: str, key: str = None):
@@ -12,6 +28,9 @@ def load_schema(fpath: str, key: str = None):
         return schema
 
 
+oss_paths = load_schema("oss_schema.json", key="paths").items()
+
+
 def convert_oss_endpoint_to_cloud(endpoint):
     endpoint = endpoint.replace(
         "api", "api/accounts/{account_id}/workspaces/{workspace_id}"
@@ -19,18 +38,17 @@ def convert_oss_endpoint_to_cloud(endpoint):
     return endpoint
 
 
-def collect_extra_oss_paths(cloud_paths, oss_paths):
-    errors = []
-    for endpoint, path in oss_paths.items():
-        cloud_endpoint = convert_oss_endpoint_to_cloud(endpoint)
-        for method in path.keys():
-            if cloud_endpoint not in cloud_paths:
-                if not any(
-                    tag in ["Admin", "Flow Run Notification Policies", "Root"]
-                    for tag in path[method]["tags"]
-                ):
-                    errors.append(f"{method.upper()}: {cloud_endpoint}")
-    return errors
+@pytest.mark.parametrize("oss_path", oss_paths, ids=[name for (name, _) in oss_paths])
+def test_oss_api_spelling_is_cloud_compatible(oss_path, cloud_paths):
+    # error_msg = f"The following API routes were present in OSS but not in Cloud: \n{list_of_routes}"
+    endpoint, path = oss_path
+    cloud_endpoint = convert_oss_endpoint_to_cloud(endpoint)
+    for method in path.keys():
+        if not any(
+            tag in ["Admin", "Flow Run Notification Policies", "Root"]
+            for tag in path[method]["tags"]
+        ):
+            assert cloud_endpoint in cloud_paths, f"{method.upper()}: {cloud_endpoint}"
 
 
 def check_path_parameter_compatibility(cloud_paths, oss_paths):
@@ -181,15 +199,6 @@ def check_type_incompatibility(cloud_types, oss_types):
     return missing, type_issues
 
 
-def test_oss_api_spelling_is_cloud_compatible(oss_schema, cloud_schema):
-    cloud_paths = load_schema(cloud_schema, key="paths")
-    oss_paths = load_schema(oss_schema, key="paths")
-    errors = collect_extra_oss_paths(cloud_paths, oss_paths)
-    list_of_routes = "\n".join(errors)
-    error_msg = f"The following API routes were present in OSS but not in Cloud: \n{list_of_routes}"
-    assert not errors, error_msg
-
-
 def test_api_path_parameters_are_compatible(oss_schema, cloud_schema):
     cloud_paths = load_schema(cloud_schema, key="paths")
     oss_paths = load_schema(oss_schema, key="paths")
@@ -227,51 +236,3 @@ def test_oss_api_types_are_cloud_compatible(oss_schema, cloud_schema):
         list_of_issues = "\n".join(type_issues)
         error_msg += f"The following API types have incompatible fields between OSS and Cloud: \n{list_of_issues}"
     assert not type_issues, error_msg
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "-oss",
-        "--oss-schema",
-        dest="oss_schema_file",
-        default="oss_schema.json",
-        help="The path to the OSS OpenAPI JSON file.",
-    )
-    parser.add_argument(
-        "-cloud",
-        "--cloud-schema",
-        dest="cloud_schema_file",
-        default="cloud_schema.json",
-        help="The path to the Cloud OpenAPI JSON file.",
-    )
-    args = parser.parse_args()
-
-    excs = []
-    try:
-        test_oss_api_spelling_is_cloud_compatible(
-            oss_schema=args.oss_schema_file, cloud_schema=args.cloud_schema_file
-        )
-    except AssertionError as exc:
-        excs.append(str(exc))
-    try:
-        test_oss_api_types_are_cloud_compatible(
-            oss_schema=args.oss_schema_file, cloud_schema=args.cloud_schema_file
-        )
-    except AssertionError as exc:
-        excs.append(str(exc))
-    try:
-        test_api_path_parameters_are_compatible(
-            oss_schema=args.oss_schema_file, cloud_schema=args.cloud_schema_file
-        )
-    except AssertionError as exc:
-        excs.append(str(exc))
-    try:
-        test_api_request_bodies_are_compatible(
-            oss_schema=args.oss_schema_file, cloud_schema=args.cloud_schema_file
-        )
-    except AssertionError as exc:
-        excs.append(str(exc))
-
-    if excs:
-        raise Exception("\n".join(excs))
