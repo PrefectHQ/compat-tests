@@ -30,6 +30,9 @@ def generate_oss_paths_by_method():
     oss_paths = load_schema("oss_schema.json", key="paths")
     output = []
     for endpoint, path in oss_paths.items():
+        # avoid experimental routes for now to allow for fast iterations
+        if "experimental" in endpoint:
+            continue
         for method in path.keys():
             output.append((method, endpoint, path))
     return output
