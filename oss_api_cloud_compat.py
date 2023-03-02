@@ -28,7 +28,13 @@ def load_schema(fpath: str, key: str = None):
         return schema
 
 
-oss_paths = load_schema("oss_schema.json", key="paths").items()
+def generate_oss_paths_by_method():
+    oss_paths = load_schema("oss_schema.json", key="paths")
+    output = []
+    for endpoint, path in oss_paths.items():
+        for method in path.keys():
+            output.append((method, endpoint, path))
+    return output
 
 
 def convert_oss_endpoint_to_cloud(endpoint):
@@ -38,60 +44,65 @@ def convert_oss_endpoint_to_cloud(endpoint):
     return endpoint
 
 
-@pytest.mark.parametrize("oss_path", oss_paths, ids=[name for (name, _) in oss_paths])
+OSS_PATHS = generate_oss_paths_by_method()
+
+
+@pytest.mark.parametrize(
+    "oss_path",
+    OSS_PATHS,
+    ids=[f"{method.upper()}: {endpoint}" for (method, endpoint, _) in OSS_PATHS],
+)
 def test_oss_api_spelling_is_cloud_compatible(oss_path, cloud_paths):
     # error_msg = f"The following API routes were present in OSS but not in Cloud: \n{list_of_routes}"
-    endpoint, path = oss_path
+    method, endpoint, path = oss_path
     cloud_endpoint = convert_oss_endpoint_to_cloud(endpoint)
-    for method in path.keys():
-        if not any(
-            tag in ["Admin", "Flow Run Notification Policies", "Root"]
-            for tag in path[method]["tags"]
-        ):
-            assert cloud_endpoint in cloud_paths, f"{method.upper()}: {cloud_endpoint}"
+    if not any(
+        tag in ["Admin", "Flow Run Notification Policies", "Root"]
+        for tag in path[method]["tags"]
+    ):
+        assert cloud_endpoint in cloud_paths, f"{method.upper()}: {cloud_endpoint}"
 
 
-def check_path_parameter_compatibility(cloud_paths, oss_paths):
-    errors = []
-    for endpoint, path in oss_paths.items():
-        cloud_endpoint = convert_oss_endpoint_to_cloud(endpoint)
-        for method in path.keys():
-            if cloud_endpoint not in cloud_paths:
-                continue  # path existence is checked in another test
-            cloud_params = cloud_paths[cloud_endpoint][method].get("parameters", [])
-            cloud_params = [
-                p
-                for p in cloud_params
-                if p["name"] not in ("account_id", "workspace_id", "token_cost")
-            ]
-            oss_params = path[method].get("parameters", [])
+@pytest.mark.parametrize(
+    "oss_path",
+    OSS_PATHS,
+    ids=[f"{method.upper()}: {endpoint}" for (method, endpoint, _) in OSS_PATHS],
+)
+def test_api_path_parameters_are_compatible(oss_path, cloud_paths):
+    method, endpoint, path = oss_path
+    cloud_endpoint = convert_oss_endpoint_to_cloud(endpoint)
+    if cloud_endpoint not in cloud_paths:
+        return  # path existence is checked in another test
 
-            # check schemas
-            cloud_params = {
-                p["name"]: (
-                    p["in"],
-                    p["required"],
-                    p["schema"]["type"],
-                    p["schema"].get("format"),
-                )
-                for p in cloud_params
-            }
-            oss_params = {
-                p["name"]: (
-                    p["in"],
-                    p["required"],
-                    p["schema"]["type"],
-                    p["schema"].get("format"),
-                )
-                for p in oss_params
-            }
+    cloud_params = cloud_paths[cloud_endpoint][method].get("parameters", [])
+    cloud_params = [
+        p
+        for p in cloud_params
+        if p["name"] not in ("account_id", "workspace_id", "token_cost")
+    ]
+    oss_params = path[method].get("parameters", [])
 
-            if cloud_params != oss_params:
-                errors.append(
-                    f"{method.upper()}: {cloud_endpoint} has parameter incompatibilities:\nCLOUD PARAMETERS:\n{cloud_params}\nOSS PARAMETERS:\n{oss_params}"
-                )
+    # check schemas
+    cloud_params = {
+        p["name"]: (
+            p["in"],
+            p["required"],
+            p["schema"]["type"],
+            p["schema"].get("format"),
+        )
+        for p in cloud_params
+    }
+    oss_params = {
+        p["name"]: (
+            p["in"],
+            p["required"],
+            p["schema"]["type"],
+            p["schema"].get("format"),
+        )
+        for p in oss_params
+    }
 
-    return errors
+    assert cloud_params == oss_params
 
 
 def lookup_schema_ref(schema, ref):
@@ -197,15 +208,6 @@ def check_type_incompatibility(cloud_types, oss_types):
                 if props.get("type") != cloud_props[field_name].get("type"):
                     type_issues.append(f"{name}.{field_name}")
     return missing, type_issues
-
-
-def test_api_path_parameters_are_compatible(oss_schema, cloud_schema):
-    cloud_paths = load_schema(cloud_schema, key="paths")
-    oss_paths = load_schema(oss_schema, key="paths")
-    errors = check_path_parameter_compatibility(cloud_paths, oss_paths)
-    list_of_issues = "\n".join(errors)
-    error_msg = f"The following API endpoints have incompatible parameter schemas: \n{list_of_issues}"
-    assert not errors, error_msg
 
 
 def test_api_request_bodies_are_compatible(oss_schema, cloud_schema):
