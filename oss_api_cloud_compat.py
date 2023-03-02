@@ -37,6 +37,14 @@ def generate_oss_paths_by_method():
     return output
 
 
+def generate_oss_types():
+    oss_types = load_schema("oss_schema.json", key="components")["schemas"]
+    output = []
+    for name, typ in oss_types.items():
+        output.append((name, typ))
+    return output
+
+
 def lookup_schema_ref(schema, ref):
     if not ref:
         return
@@ -57,6 +65,7 @@ def convert_oss_endpoint_to_cloud(endpoint):
 
 
 OSS_PATHS = generate_oss_paths_by_method()
+OSS_TYPES = generate_oss_types()
 
 
 @pytest.mark.parametrize(
@@ -177,49 +186,24 @@ def test_api_request_bodies_are_compatible(oss_path, oss_schema, cloud_schema):
     assert cloud_props == oss_props
 
 
-def check_type_incompatibility(cloud_types, oss_types):
-    missing, type_issues = [], []
-
-    for name, typ in oss_types.items():
-        if name not in cloud_types:
-            missing.append(name)
-            continue
-
-        for master_key in ["properties", "required", "enum", "type"]:
-            oss_props, cloud_props = typ.get(master_key, {}), cloud_types[name].get(
-                master_key, {}
-            )
-
-            if not isinstance(oss_props, dict):
-                if oss_props != cloud_props:
-                    type_issues.append(f"{name}.{master_key}")
-                continue
-
-            for field_name, props in oss_props.items():
-                if field_name not in cloud_props:
-                    type_issues.append(f"{name}.{field_name}")
-                    continue
-                if props.get("type") != cloud_props[field_name].get("type"):
-                    type_issues.append(f"{name}.{field_name}")
-    return missing, type_issues
-
-
-@pytest.mark.skip
-def test_oss_api_types_are_cloud_compatible(oss_schema, cloud_schema):
-    cloud_types = load_schema(cloud_schema, key="components")
-    oss_types = load_schema(oss_schema, key="components")
-    missing, type_issues = check_type_incompatibility(
-        cloud_types["schemas"], oss_types["schemas"]
-    )
+@pytest.mark.parametrize("oss_type", OSS_TYPES, ids=[name for (name, _) in OSS_TYPES])
+def test_oss_api_types_are_cloud_compatible(oss_type, cloud_schema):
+    cloud_types = cloud_schema["components"]["schemas"]
+    name, typ = oss_type
 
     # ignore missing for now, as there are name incompatibilies to study
-    list_of_missing = "\n".join(missing)
-    error_msg = ""
-    if missing:
-        # error_msg += f"The following API types were present in OSS but not Cloud: {list_of_missing}"
-        pass
+    if name not in cloud_types:
+        return
 
-    if type_issues:
-        list_of_issues = "\n".join(type_issues)
-        error_msg += f"The following API types have incompatible fields between OSS and Cloud: \n{list_of_issues}"
-    assert not type_issues, error_msg
+    for master_key in ["properties", "required", "enum", "type"]:
+        oss_props, cloud_props = typ.get(master_key, {}), cloud_types[name].get(
+            master_key, {}
+        )
+
+        if not isinstance(oss_props, dict):
+            assert oss_props == cloud_props
+            return
+
+        for field_name, props in oss_props.items():
+            assert field_name in cloud_props
+            assert props.get("type") == cloud_props[field_name].get("type")
