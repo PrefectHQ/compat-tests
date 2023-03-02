@@ -1,7 +1,5 @@
-import argparse
 import json
 import pytest
-import sys
 
 
 @pytest.fixture
