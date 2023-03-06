@@ -1,4 +1,5 @@
 import json
+
 import pytest
 
 
@@ -59,6 +60,9 @@ def lookup_schema_ref(schema, ref):
 
 
 def convert_oss_endpoint_to_cloud(endpoint):
+    # Collections endpoint is not nested under accounts and workspaces in Cloud
+    if endpoint == "/api/collections/views/{view}":
+        return endpoint
     endpoint = endpoint.replace(
         "api", "api/accounts/{account_id}/workspaces/{workspace_id}"
     )
@@ -123,6 +127,11 @@ def test_api_path_parameters_are_compatible(oss_path, cloud_paths):
         )
         for p in oss_params
     }
+
+    if "collections" in endpoint:
+        # The collections endpoint does not require x-prefect-api-version
+        # header in Cloud because it is part of the Nebula service
+        oss_params.pop("x-prefect-api-version", None)
 
     assert cloud_params == oss_params
 
