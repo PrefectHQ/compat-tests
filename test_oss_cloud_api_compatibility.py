@@ -193,7 +193,11 @@ def test_api_request_bodies_are_compatible(oss_path, oss_schema, cloud_schema):
         {prop_gettr(name, d) for name, d in oss_ref_schema["properties"].items()},
     )
 
-    assert cloud_props == oss_props
+    ## have to do some delicate handling here - request bodies are compatible so long as:
+    ## - OSS fields are always present in Cloud
+    ## - new Cloud fields aren't required (this is difficult to check right now as it's method dependent!)
+    assert cloud_props[0] == oss_props[0]
+    assert oss_props[1] <= cloud_props[1]
 
 
 @pytest.mark.parametrize("oss_type", OSS_TYPES, ids=[name for (name, _) in OSS_TYPES])
