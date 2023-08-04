@@ -108,22 +108,27 @@ def test_api_path_parameters_are_compatible(oss_path, cloud_paths):
     ]
     oss_params = path[method].get("parameters", [])
 
+    def param_type_and_format(schema):
+        if "anyOf" in schema:
+            return [(item["type"], item.get("format")) for item in schema["anyOf"]]
+        else:
+            return (schema["type"], schema.get("format"))
+
     # check schemas
     cloud_params = {
         p["name"]: (
             p["in"],
             p["required"],
-            p["schema"]["type"],
-            p["schema"].get("format"),
+            *param_type_and_format(p["schema"]),
         )
         for p in cloud_params
     }
+
     oss_params = {
         p["name"]: (
             p["in"],
             p["required"],
-            p["schema"]["type"],
-            p["schema"].get("format"),
+            *param_type_and_format(p["schema"]),
         )
         for p in oss_params
     }
