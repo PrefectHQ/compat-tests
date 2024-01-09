@@ -180,12 +180,23 @@ def test_api_request_bodies_are_compatible(oss_path, oss_schema, cloud_schema):
         type=None, properties={}
     )
 
+    def hashable_default(d):
+        # Some default values are lists or other unhashable types, so convert
+        # them to a string representation for comparison purposes.
+        default = d.get("default")
+        if default == []:
+            return "list"
+        elif default == {}:
+            return "dict"
+        else:
+            return default
+
     # TODO: add sorts and filters
     prop_gettr = lambda name, d: (
         name,
         d.get("type"),
         d.get("format"),
-        d.get("default"),
+        hashable_default(d),
         d.get("deprecated"),
     )
 
