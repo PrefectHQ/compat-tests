@@ -1,4 +1,5 @@
 import json
+import re
 
 import pytest
 
@@ -27,12 +28,19 @@ def load_schema(fpath: str, key: str = None):
         return schema
 
 
+OSS_PATH_IGNORE_REGEXES = {
+    # CSRF protection is OSS only.
+    re.compile(r"^/api/csrf-token$"),
+    # avoid experimental routes to allow for fast iterations
+    re.compile(r".*experimental.*"),
+}
+
+
 def generate_oss_paths_by_method():
-    oss_paths = load_schema("oss_schema.json", key="paths")
+    oss_paths: dict[str, dict[str, dict]] = load_schema("oss_schema.json", key="paths")
     output = []
     for endpoint, path in oss_paths.items():
-        # avoid experimental routes for now to allow for fast iterations
-        if "experimental" in endpoint:
+        if any(regex.match(endpoint) for regex in OSS_PATH_IGNORE_REGEXES):
             continue
         for method in path.keys():
             output.append((method, endpoint, path))
@@ -226,8 +234,9 @@ def test_oss_api_types_are_cloud_compatible(oss_type, cloud_schema):
         return
 
     for master_key in ["properties", "required", "enum", "type"]:
-        oss_props, cloud_props = typ.get(master_key, {}), cloud_types[name].get(
-            master_key, {}
+        oss_props, cloud_props = (
+            typ.get(master_key, {}),
+            cloud_types[name].get(master_key, {}),
         )
 
         if not isinstance(oss_props, dict):
