@@ -141,9 +141,9 @@ def test_api_path_parameters_are_compatible(oss_path, cloud_paths):
         for p in oss_params
     }
 
-    if "collections" in endpoint:
-        # The collections endpoint does not require x-prefect-api-version
-        # header in Cloud because it is part of the Nebula service
+    if "collections" in endpoint or "events" in endpoint:
+        # The collections and events endpoints do not require x-prefect-api-version
+        # header in Cloud because they are part of non-orchestration services
         oss_params.pop("x-prefect-api-version", None)
 
     assert cloud_params == oss_params
