@@ -255,10 +255,10 @@ def test_oss_api_types_are_cloud_compatible(oss_type, cloud_schema):
 
         if not isinstance(oss_props, dict):
             if name in INCLUDES_ACCOUNT_AND_WORKSPACE and master_key == "required":
-                if "account" in oss_props:
-                    oss_props.remove("account")
-                if "workspace" in oss_props:
-                    oss_props.remove("workspace")
+                if "account" in cloud_props:
+                    cloud_props.remove("account")
+                if "workspace" in cloud_props:
+                    cloud_props.remove("workspace")
 
             assert oss_props == cloud_props
 
