@@ -35,6 +35,21 @@ OSS_PATH_IGNORE_REGEXES = {
     re.compile(r".*experimental.*"),
 }
 
+# OSS has support for some request properties that are not yet in Cloud, but
+# that are forward compatible.
+FORWARD_COMPATIBLE_OSS_REQUEST_PROPS = {
+    "/api/deployments/": ["job_variables"],
+    "/api/deployments/{id}": ["job_variables"],
+}
+
+# OSS has support for some properties in its API types that are not yet in
+# Cloud but that are forward compatible.
+FORWARD_COMPATIBLE_OSS_API_TYPE_PROPS = {
+    "DeploymentCreate": ["job_variables"],
+    "DeploymentUpdate": ["job_variables"],
+    "DeploymentResponse": ["job_variables"]
+}
+
 
 def generate_oss_paths_by_method():
     oss_paths: dict[str, dict[str, dict]] = load_schema("oss_schema.json", key="paths")
@@ -221,7 +236,8 @@ def test_api_request_bodies_are_compatible(oss_path, oss_schema, cloud_schema):
     )
     oss_props = (
         oss_ref_schema["type"],
-        {prop_gettr(name, d) for name, d in oss_ref_schema["properties"].items()},
+        {prop_gettr(name, d) for name, d in oss_ref_schema["properties"].items()
+         if name not in FORWARD_COMPATIBLE_OSS_REQUEST_PROPS.get(endpoint, [])}
     )
 
     ## have to do some delicate handling here - request bodies are compatible so long as:
@@ -236,7 +252,7 @@ def test_oss_api_types_are_cloud_compatible(oss_type, cloud_schema):
     cloud_types = cloud_schema["components"]["schemas"]
     name, typ = oss_type
 
-    # ignore missing for now, as there are name incompatibilies to study
+    # ignore missing for now, as there are name incompatibilities to study
     if name not in cloud_types:
         return
 
@@ -264,6 +280,9 @@ def test_oss_api_types_are_cloud_compatible(oss_type, cloud_schema):
 
             return
 
-        for field_name, props in oss_props.items():
+        items = [(k, v) for k, v in oss_props.items()
+                 if k not in FORWARD_COMPATIBLE_OSS_API_TYPE_PROPS.get(name, [])]
+
+        for field_name, props in items:
             assert field_name in cloud_props
             assert props.get("type") == cloud_props[field_name].get("type")
