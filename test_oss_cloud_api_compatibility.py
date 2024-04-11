@@ -156,9 +156,16 @@ def test_api_path_parameters_are_compatible(oss_path, cloud_paths):
         for p in oss_params
     }
 
-    if "collections" in endpoint or "events" in endpoint:
-        # The collections and events endpoints do not require x-prefect-api-version
-        # header in Cloud because they are part of non-orchestration services
+    # Some sets of endpoints do not require x-prefect-api-version header in Cloud
+    # because they are part of non-orchestration services
+    ENDPOINT_GROUPS_WITHOUT_API_VERSION = [
+        "collections",
+        "events",
+        "automations",
+        "templates",
+    ]
+
+    if any(group in cloud_endpoint for group in ENDPOINT_GROUPS_WITHOUT_API_VERSION):
         oss_params.pop("x-prefect-api-version", None)
 
     assert cloud_params == oss_params
