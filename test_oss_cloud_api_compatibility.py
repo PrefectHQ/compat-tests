@@ -259,13 +259,6 @@ def test_oss_api_types_are_cloud_compatible(oss_type, cloud_schema):
     if name not in cloud_types:
         return
 
-    # some Cloud schemas will include account/workspace, but OSS will not, but this
-    # is not necessarily a compatibility issue if the schema is otherwise the same
-    INCLUDES_ACCOUNT_AND_WORKSPACE = [
-        "Automation",
-        "ReceivedEvent",
-    ]
-
     for master_key in ["properties", "required", "enum", "type"]:
         oss_props, cloud_props = (
             typ.get(master_key, {}),
@@ -273,14 +266,8 @@ def test_oss_api_types_are_cloud_compatible(oss_type, cloud_schema):
         )
 
         if not isinstance(oss_props, dict):
-            if name in INCLUDES_ACCOUNT_AND_WORKSPACE and master_key == "required":
-                if "account" in cloud_props:
-                    cloud_props.remove("account")
-                if "workspace" in cloud_props:
-                    cloud_props.remove("workspace")
-
             if isinstance(oss_props, list):
-                # when there are multiple possible path values, OSS should be a subset of Cloud
+                # OSS types should be a subset of Cloud
                 assert set(oss_props) <= set(cloud_props)
             else:
                 assert oss_props == cloud_props
