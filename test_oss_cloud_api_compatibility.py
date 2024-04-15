@@ -47,7 +47,7 @@ FORWARD_COMPATIBLE_OSS_REQUEST_PROPS = {
 FORWARD_COMPATIBLE_OSS_API_TYPE_PROPS = {
     "DeploymentCreate": ["job_variables"],
     "DeploymentUpdate": ["job_variables"],
-    "DeploymentResponse": ["job_variables"]
+    "DeploymentResponse": ["job_variables"],
 }
 
 
@@ -135,7 +135,7 @@ def test_api_path_parameters_are_compatible(oss_path, cloud_paths):
         if "anyOf" in schema:
             return [(item["type"], item.get("format")) for item in schema["anyOf"]]
         else:
-            return (schema["type"], schema.get("format"))
+            return (schema.get("type"), schema.get("format"))
 
     # check schemas
     cloud_params = {
@@ -236,8 +236,11 @@ def test_api_request_bodies_are_compatible(oss_path, oss_schema, cloud_schema):
     )
     oss_props = (
         oss_ref_schema["type"],
-        {prop_gettr(name, d) for name, d in oss_ref_schema["properties"].items()
-         if name not in FORWARD_COMPATIBLE_OSS_REQUEST_PROPS.get(endpoint, [])}
+        {
+            prop_gettr(name, d)
+            for name, d in oss_ref_schema["properties"].items()
+            if name not in FORWARD_COMPATIBLE_OSS_REQUEST_PROPS.get(endpoint, [])
+        },
     )
 
     ## have to do some delicate handling here - request bodies are compatible so long as:
@@ -276,12 +279,19 @@ def test_oss_api_types_are_cloud_compatible(oss_type, cloud_schema):
                 if "workspace" in cloud_props:
                     cloud_props.remove("workspace")
 
-            assert oss_props == cloud_props
+            if isinstance(oss_props, list):
+                # when there are multiple possible path values, OSS should be a subset of Cloud
+                assert set(oss_props) <= set(cloud_props)
+            else:
+                assert oss_props == cloud_props
 
             return
 
-        items = [(k, v) for k, v in oss_props.items()
-                 if k not in FORWARD_COMPATIBLE_OSS_API_TYPE_PROPS.get(name, [])]
+        items = [
+            (k, v)
+            for k, v in oss_props.items()
+            if k not in FORWARD_COMPATIBLE_OSS_API_TYPE_PROPS.get(name, [])
+        ]
 
         for field_name, props in items:
             assert field_name in cloud_props
