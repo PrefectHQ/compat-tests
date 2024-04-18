@@ -283,3 +283,23 @@ def test_oss_api_types_are_cloud_compatible(oss_type, cloud_schema):
         for field_name, props in items:
             assert field_name in cloud_props
             assert props.get("type") == cloud_props[field_name].get("type")
+
+            # For fields that support multiple types, ensure that Cloud supports a
+            # superset of the types that OSS does
+
+            oss_options = set(deep_tuple(props.get("anyOf", [])))
+            cloud_options = set(deep_tuple(cloud_props[field_name].get("anyOf", [])))
+
+            assert oss_options <= cloud_options
+
+
+def deep_tuple(o):
+    """Given an object `o` that is either a dictionary, a list, or any other hashable
+    type, return a tuple representation of it where all components are also converted
+    into tuples."""
+    if isinstance(o, dict):
+        return tuple((k, deep_tuple(v)) for k, v in o.items())
+    elif isinstance(o, list):
+        return tuple(deep_tuple(v) for v in o)
+    else:
+        return o
