@@ -127,3 +127,9 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+
+# Files used to run the compat tests
+compat-venv
+cloud_schema.json
+oss_schema.json
