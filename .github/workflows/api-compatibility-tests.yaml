@@ -52,7 +52,7 @@
           run: curl https://api.prefect.cloud/api/openapi.json > cloud_schema.json
 
         - name: Create OSS OpenAPI JSON
-          run: python -c "import json; from prefect.server.api.server import create_app; openapi_schema = create_app().openapi(); json.dump(openapi_schema, sys.stdout)" > oss_schema.json
+          run: python -c "import json, sys; from prefect.server.api.server import create_app; openapi_schema = create_app().openapi(); json.dump(openapi_schema, sys.stdout)" > oss_schema.json
 
         - name: Run API compatibility tests
           run: pytest -vv
