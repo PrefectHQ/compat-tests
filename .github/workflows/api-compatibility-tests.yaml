@@ -46,7 +46,7 @@
         - name: Install packages
           run: |
             python -m pip install -U uv
-            uv pip install --upgrade --system prefect 'pydantic>=2.4,<3'
+            uv pip install --upgrade --system prefect 'pydantic>=2.4,<3' pytest
 
         - name: Create Cloud OpenAPI JSON
           run: curl https://api.prefect.cloud/api/openapi.json > cloud_schema.json
