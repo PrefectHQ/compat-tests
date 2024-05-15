@@ -286,6 +286,9 @@ def test_oss_api_types_are_cloud_compatible(oss_type, cloud_schema):
             oss_options = set()
             cloud_options = set()
 
+            # types can be specified in either the `type` field
+            # for a single value or the `anyOf` field for multiple values
+
             if props.get("type"):
                 oss_options = {props.get("type")}
             elif props.get("anyOf"):
