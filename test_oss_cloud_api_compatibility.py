@@ -221,10 +221,17 @@ def test_api_request_bodies_are_compatible(oss_path, oss_schema, cloud_schema):
         else:
             return default
 
+    def extract_types(d):
+        if "type" in d:
+            return {d["type"]}
+        elif "anyOf" in d:
+            return {item.get("type") for item in d["anyOf"] if item.get("type")}
+        return set()
+
     # TODO: add sorts and filters
     prop_gettr = lambda name, d: (
         name,
-        d.get("type"),
+        extract_types(d),
         d.get("format"),
         hashable_default(d),
         d.get("deprecated"),
@@ -232,22 +239,33 @@ def test_api_request_bodies_are_compatible(oss_path, oss_schema, cloud_schema):
 
     cloud_props = (
         cloud_ref_schema["type"],
-        {prop_gettr(name, d) for name, d in cloud_ref_schema["properties"].items()},
+        {name: prop_gettr(name, d) for name, d in cloud_ref_schema["properties"].items()},
     )
     oss_props = (
         oss_ref_schema["type"],
         {
-            prop_gettr(name, d)
+            name: prop_gettr(name, d)
             for name, d in oss_ref_schema["properties"].items()
             if name not in FORWARD_COMPATIBLE_OSS_REQUEST_PROPS.get(endpoint, [])
         },
     )
 
-    ## have to do some delicate handling here - request bodies are compatible so long as:
-    ## - OSS fields are always present in Cloud
-    ## - new Cloud fields aren't required (this is difficult to check right now as it's method dependent!)
+    # have to do some delicate handling here - request bodies are compatible so long as:
+    # - OSS fields are always present in Cloud
+    # - new Cloud fields aren't required (this is difficult to check right now as it's method dependent!)
     assert cloud_props[0] == oss_props[0]
-    assert oss_props[1] <= cloud_props[1]
+
+    # ensure every OSS field is present in Cloud
+    # ensure the property attributes are the same or a subset (like in the case of type)
+    for field_name, (oss_name, oss_types, oss_format, oss_default, oss_deprecated) in oss_props[1].items():
+        assert field_name in cloud_props[1]
+        (cloud_name, cloud_types, cloud_format, cloud_default, cloud_deprecated) = cloud_props[1][field_name]
+
+        assert oss_name == cloud_name
+        assert oss_types <= cloud_types
+        assert oss_format == cloud_format
+        assert oss_default == cloud_default
+        assert oss_deprecated == cloud_deprecated
 
 
 @pytest.mark.parametrize("oss_type", OSS_TYPES, ids=[name for (name, _) in OSS_TYPES])
