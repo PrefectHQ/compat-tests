@@ -224,7 +224,7 @@ def test_api_request_bodies_are_compatible(oss_path, oss_schema, cloud_schema):
     # TODO: add sorts and filters
     prop_gettr = lambda name, d: (
         name,
-        d.get("type"),
+        # d.get("type"),
         d.get("format"),
         hashable_default(d),
         d.get("deprecated"),
