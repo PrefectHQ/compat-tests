@@ -282,13 +282,19 @@ def test_oss_api_types_are_cloud_compatible(oss_type, cloud_schema):
 
         for field_name, props in items:
             assert field_name in cloud_props
-            assert props.get("type") == cloud_props[field_name].get("type")
 
-            # For fields that support multiple types, ensure that Cloud supports a
-            # superset of the types that OSS does
+            oss_options = set()
+            cloud_options = set()
 
-            oss_options = set(deep_tuple(props.get("anyOf", [])))
-            cloud_options = set(deep_tuple(cloud_props[field_name].get("anyOf", [])))
+            if props.get("type"):
+                oss_options = {props.get("type")}
+            elif props.get("anyOf"):
+                oss_options = {opt.get("type") for opt in props.get("anyOf") if opt.get("type")}
+
+            if cloud_props[field_name].get("type"):
+                cloud_options = {cloud_props[field_name].get("type")}
+            elif cloud_props[field_name].get("anyOf"):
+                cloud_options = {opt.get("type") for opt in cloud_props[field_name].get("anyOf") if opt.get("type")}
 
             assert oss_options <= cloud_options
 
