@@ -250,13 +250,13 @@ def test_api_request_bodies_are_compatible(oss_path, oss_schema, cloud_schema):
         },
     )
 
-    ## have to do some delicate handling here - request bodies are compatible so long as:
-    ## - OSS fields are always present in Cloud
-    ## - new Cloud fields aren't required (this is difficult to check right now as it's method dependent!)
+    # have to do some delicate handling here - request bodies are compatible so long as:
+    # - OSS fields are always present in Cloud
+    # - new Cloud fields aren't required (this is difficult to check right now as it's method dependent!)
     assert cloud_props[0] == oss_props[0]
 
     # ensure every OSS field is present in Cloud
-    # ensure the properties are the same or a subset (like in the case of type)
+    # ensure the property attributes are the same or a subset (like in the case of type)
     for field_name, (oss_name, oss_types, oss_format, oss_default, oss_deprecated) in oss_props[1].items():
         assert field_name in cloud_props[1]
         (cloud_name, cloud_types, cloud_format, cloud_default, cloud_deprecated) = cloud_props[1][field_name]
