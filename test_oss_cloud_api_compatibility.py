@@ -298,7 +298,6 @@ def test_api_request_bodies_are_compatible(oss_path, oss_schema, cloud_schema):
         oss_default,
         oss_deprecated,
     ) in oss_props[1].values():
-        print(endpoint, method, oss_name)
         if endpoint in KNOWN_ALIASES:
             if method in KNOWN_ALIASES[endpoint]:
                 if oss_name in KNOWN_ALIASES[endpoint][method]:
