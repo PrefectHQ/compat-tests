@@ -305,7 +305,7 @@ def test_api_request_bodies_are_compatible(oss_path, oss_schema, cloud_schema):
 
         # Note, this print is here intentionally to make it easier to understand test
         # failures when looping over fields
-        print(oss_name)
+        print("parameter name:", oss_name)
 
         assert oss_name in cloud_props[1]
         (
@@ -388,7 +388,7 @@ def test_oss_api_types_are_cloud_compatible(oss_name_and_type, cloud_schema):
         for field_name, props in items:
             # Note, this print is here intentionally to make it easier to understand
             # test failures when looping over fields
-            print(field_name)
+            print("field name:", field_name)
 
             assert field_name in cloud_props
 
