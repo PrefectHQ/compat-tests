@@ -120,7 +120,6 @@ def lookup_content_body_schema(body: dict[str, Any]) -> dict[str, Any] | None:
 
 
 OSS_PATHS = generate_oss_paths_by_method()
-OSS_PATHS = [path for path in OSS_PATHS if path[1] == "/api/deployments/"]
 OSS_TYPES = generate_oss_types()
 
 
