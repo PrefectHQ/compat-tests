@@ -51,6 +51,14 @@ FORWARD_COMPATIBLE_OSS_API_TYPE_PROPS = {
     "DeploymentResponse": ["job_variables"],
 }
 
+KNOWN_INCOMPATIBLE_API_REQUEST_BODIES = {
+    "/api/deployments": {
+        "post": {
+            "default"
+        }
+    }
+}
+
 
 def generate_oss_paths_by_method():
     oss_paths: dict[str, dict[str, dict]] = load_schema("oss_schema.json", key="paths")
