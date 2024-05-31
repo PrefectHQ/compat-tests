@@ -51,8 +51,12 @@ FORWARD_COMPATIBLE_OSS_API_TYPE_PROPS = {
     "DeploymentResponse": ["job_variables"],
 }
 
-KNOWN_INCOMPATIBLE_API_REQUEST_BODIES = {
-    "/api/deployments": {
+# Properties for endpoints that are known to be incompatible between OSS and Cloud
+# so we want to skip them in the comparison.
+# The format is endpoint:method:<set of properties to ignore>
+# options are: "name", "types", "format", "default", "deprecated"
+KNOWN_INCOMPATIBLE_API_REQUEST_PROPS = {
+    "/api/deployments/": {
         "post": {
             "default"
         }
@@ -116,6 +120,7 @@ def lookup_content_body_schema(body: dict[str, Any]) -> dict[str, Any] | None:
 
 
 OSS_PATHS = generate_oss_paths_by_method()
+OSS_PATHS = [path for path in OSS_PATHS if path[1] == "/api/deployments/"]
 OSS_TYPES = generate_oss_types()
 
 
@@ -334,11 +339,22 @@ def test_api_request_bodies_are_compatible(oss_path, oss_schema, cloud_schema):
         # while Cloud does not.
         oss_types.discard("null")
 
-        assert oss_name == cloud_name
-        assert oss_types <= cloud_types
-        assert oss_format == cloud_format
-        assert oss_default == cloud_default
-        assert oss_deprecated == cloud_deprecated
+        known_incompatible_props = KNOWN_INCOMPATIBLE_API_REQUEST_PROPS.get(endpoint, {}).get(method, set())
+
+        if "name" not in known_incompatible_props:
+            assert oss_name == cloud_name
+
+        if "types" not in known_incompatible_props:
+            assert oss_types <= cloud_types
+
+        if "format" not in known_incompatible_props:
+            assert oss_format == cloud_format
+
+        if "default" not in known_incompatible_props:
+            assert oss_default == cloud_default
+
+        if "deprecated" not in known_incompatible_props:
+            assert oss_deprecated == cloud_deprecated
 
 
 @pytest.mark.parametrize(
