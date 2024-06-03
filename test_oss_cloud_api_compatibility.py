@@ -53,12 +53,12 @@ FORWARD_COMPATIBLE_OSS_API_TYPE_PROPS = {
 
 # Properties for endpoints that are known to be incompatible between OSS and Cloud
 # so we want to skip them in the comparison.
-# The format is endpoint:method:<set of properties to ignore>
+# The format is endpoint:method:field:<set of properties to ignore>
 # options are: "name", "types", "format", "default", "deprecated"
 KNOWN_INCOMPATIBLE_API_REQUEST_PROPS = {
     "/api/deployments/": {
         "post": {
-            "default"
+            "enforce_parameter_schema": {"default"},
         }
     }
 }
@@ -338,7 +338,7 @@ def test_api_request_bodies_are_compatible(oss_path, oss_schema, cloud_schema):
         # while Cloud does not.
         oss_types.discard("null")
 
-        known_incompatible_props = KNOWN_INCOMPATIBLE_API_REQUEST_PROPS.get(endpoint, {}).get(method, set())
+        known_incompatible_props = KNOWN_INCOMPATIBLE_API_REQUEST_PROPS.get(endpoint, {}).get(method, {}).get(oss_name, set())
 
         if "name" not in known_incompatible_props:
             assert oss_name == cloud_name
