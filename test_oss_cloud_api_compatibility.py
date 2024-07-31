@@ -196,6 +196,7 @@ def test_api_path_parameters_are_compatible(oss_path, cloud_paths):
         "events",
         "automations",
         "templates",
+        "download-logs-csv",
     ]
 
     if any(group in cloud_endpoint for group in ENDPOINT_GROUPS_WITHOUT_API_VERSION):
