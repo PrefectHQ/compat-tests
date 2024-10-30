@@ -282,26 +282,6 @@ def test_api_request_bodies_are_compatible(oss_path, oss_schema, cloud_schema):
     # - new Cloud fields aren't required (this is difficult to check right now as it's method dependent!)
     assert cloud_props[0] == oss_props[0]
 
-    # Handling of aliases is different between Pydantic v2 and v1, so we'll force
-    # some name overrides here
-    KNOWN_ALIASES = {
-        "/api/flow_runs/history": {
-            "post": {
-                "history_interval": "history_interval_seconds",
-            }
-        },
-        "/api/task_runs/history": {
-            "post": {
-                "history_interval": "history_interval_seconds",
-            }
-        },
-        "/api/ui/schemas/validate": {
-            "post": {
-                "json_schema": "schema",
-            }
-        },
-    }
-
     # ensure every OSS field is present in Cloud
     # ensure the property attributes are the same or a subset (like in the case of type)
     for (
@@ -311,11 +291,6 @@ def test_api_request_bodies_are_compatible(oss_path, oss_schema, cloud_schema):
         oss_default,
         oss_deprecated,
     ) in oss_props[1].values():
-        if endpoint in KNOWN_ALIASES:
-            if method in KNOWN_ALIASES[endpoint]:
-                if oss_name in KNOWN_ALIASES[endpoint][method]:
-                    oss_name = KNOWN_ALIASES[endpoint][method][oss_name]
-
         # Note, this print is here intentionally to make it easier to understand test
         # failures when looping over fields
         print("parameter name:", oss_name)
@@ -339,7 +314,11 @@ def test_api_request_bodies_are_compatible(oss_path, oss_schema, cloud_schema):
         # while Cloud does not.
         oss_types.discard("null")
 
-        known_incompatible_props = KNOWN_INCOMPATIBLE_API_REQUEST_PROPS.get(endpoint, {}).get(method, {}).get(oss_name, set())
+        known_incompatible_props = (
+            KNOWN_INCOMPATIBLE_API_REQUEST_PROPS.get(endpoint, {})
+            .get(method, {})
+            .get(oss_name, set())
+        )
 
         if "name" not in known_incompatible_props:
             assert oss_name == cloud_name
