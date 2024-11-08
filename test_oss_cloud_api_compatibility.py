@@ -5,9 +5,16 @@ from typing import Any
 import pytest
 
 
+PREFECT_V2 = False
+
+
 @pytest.fixture
 def oss_schema():
-    return load_schema("oss_schema.json")
+    schema = load_schema("oss_schema.json")
+    if schema["info"]["version"].startswith("2"):
+        global PREFECT_V2
+        PREFECT_V2 = True
+    return schema
 
 
 @pytest.fixture
@@ -252,11 +259,21 @@ def test_api_request_bodies_are_compatible(oss_path, oss_schema, cloud_schema):
             return {item.get("type") for item in d["anyOf"] if item.get("type")}
         return set()
 
+    def extract_format(d):
+        if "format" in d:
+            return d["format"]
+        # in practice, this will have only one format
+        elif "anyOf" in d:
+            for option in d["anyOf"]:
+                if option.get("format"):
+                    return option.get("format")
+        return None
+
     # TODO: add sorts and filters
     prop_gettr = lambda name, d: (
         name,
         extract_types(d),
-        d.get("format"),
+        extract_format(d),
         hashable_default(d),
         d.get("deprecated"),
     )
@@ -294,6 +311,11 @@ def test_api_request_bodies_are_compatible(oss_path, oss_schema, cloud_schema):
         # Note, this print is here intentionally to make it easier to understand test
         # failures when looping over fields
         print("parameter name:", oss_name)
+
+        if oss_name == "history_interval_seconds":
+            oss_name = "history_interval"  # cloud aliases this which doesn't appear in the schema
+        elif oss_name == "schema" and PREFECT_V2:
+            oss_name = "json_schema"  # UI schema validation doesnt really matter for 2.x OSS compat
 
         assert oss_name in cloud_props[1]
         (
@@ -392,6 +414,14 @@ def test_oss_api_types_are_cloud_compatible(oss_name_and_type, cloud_schema):
             # Note, this print is here intentionally to make it easier to understand
             # test failures when looping over fields
             print("field name:", field_name)
+
+            # fields are ignored in all cases
+            if (
+                PREFECT_V2
+                and name == "StateCreate"
+                and field_name in ["timestamp", "id"]
+            ):
+                continue
 
             assert field_name in cloud_props
 
