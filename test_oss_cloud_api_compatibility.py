@@ -41,6 +41,8 @@ OSS_PATH_IGNORE_REGEXES = {
     re.compile(r"^/api/csrf-token$"),
     # avoid experimental routes to allow for fast iterations
     re.compile(r".*experimental.*"),
+    # ignore the UI routes because OSS has it's own distinct UI
+    re.compile(r"^/api/ui.*"),
 }
 
 # OSS has support for some request properties that are not yet in Cloud, but
