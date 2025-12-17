@@ -360,6 +360,143 @@ def test_api_request_bodies_are_compatible(oss_path, oss_schema, cloud_schema):
             assert oss_deprecated == cloud_deprecated
 
 
+def resolve_response_schema(response_def: dict[str, Any]) -> dict[str, Any] | None:
+    """Extract the response schema from an endpoint's response definition."""
+    success_response = response_def.get("200", {})
+    content = success_response.get("content", {})
+    json_content = content.get("application/json", {})
+    schema = json_content.get("schema", {})
+
+    if "$ref" in schema:
+        return schema["$ref"]
+    elif "allOf" in schema:
+        return schema.get("allOf", [{}])[0].get("$ref")
+
+    return None
+
+
+def get_schema_properties_recursive(
+    schema: dict[str, Any],
+    full_schema: dict[str, Any],
+    prefix: str = "",
+) -> dict[str, set[str]]:
+    """
+    Recursively extract all properties from a schema, following $refs.
+
+    Returns a dict mapping property paths to their types.
+    For nested objects/arrays, the path is dot-separated (e.g., "results.parameters").
+    """
+    properties: dict[str, set[str]] = {}
+
+    if "$ref" in schema:
+        ref_schema = lookup_schema_ref(full_schema, schema["$ref"])
+        if ref_schema:
+            return get_schema_properties_recursive(ref_schema, full_schema, prefix)
+        return properties
+
+    if "allOf" in schema:
+        for item in schema["allOf"]:
+            properties.update(
+                get_schema_properties_recursive(item, full_schema, prefix)
+            )
+        return properties
+
+    schema_props = schema.get("properties", {})
+
+    for prop_name, prop_def in schema_props.items():
+        full_path = f"{prefix}.{prop_name}" if prefix else prop_name
+
+        prop_types: set[str] = set()
+        if "type" in prop_def:
+            prop_types.add(prop_def["type"])
+        elif "anyOf" in prop_def:
+            for option in prop_def["anyOf"]:
+                if "type" in option:
+                    prop_types.add(option["type"])
+                elif "$ref" in option:
+                    prop_types.add("$ref")
+
+        properties[full_path] = prop_types
+
+        if prop_def.get("type") == "array":
+            items = prop_def.get("items", {})
+            if "$ref" in items:
+                ref_schema = lookup_schema_ref(full_schema, items["$ref"])
+                if ref_schema:
+                    nested = get_schema_properties_recursive(
+                        ref_schema, full_schema, full_path
+                    )
+                    properties.update(nested)
+            elif items.get("properties"):
+                nested = get_schema_properties_recursive(items, full_schema, full_path)
+                properties.update(nested)
+
+        elif prop_def.get("type") == "object" and prop_def.get("properties"):
+            nested = get_schema_properties_recursive(prop_def, full_schema, full_path)
+            properties.update(nested)
+
+        elif "$ref" in prop_def:
+            ref_schema = lookup_schema_ref(full_schema, prop_def["$ref"])
+            if ref_schema and ref_schema.get("properties"):
+                nested = get_schema_properties_recursive(
+                    ref_schema, full_schema, full_path
+                )
+                properties.update(nested)
+
+    return properties
+
+
+@pytest.mark.parametrize(
+    "oss_path",
+    OSS_PATHS,
+    ids=[f"{method.upper()}: {endpoint}" for (method, endpoint, _) in OSS_PATHS],
+)
+def test_api_response_bodies_are_compatible(oss_path, oss_schema, cloud_schema):
+    """
+    Verify that Cloud's response bodies are a superset of OSS's response bodies.
+
+    This test recursively resolves $refs to compare the actual properties returned
+    by each endpoint, ensuring that any field present in OSS responses is also
+    present in Cloud responses.
+    """
+    cloud_paths = cloud_schema["paths"]
+
+    method, endpoint, path = oss_path
+    cloud_endpoint = convert_oss_endpoint_to_cloud(endpoint)
+
+    if cloud_endpoint not in cloud_paths:
+        return  # path existence is checked in another test
+
+    oss_responses = path[method].get("responses", {})
+    cloud_responses = cloud_paths[cloud_endpoint][method].get("responses", {})
+
+    oss_response_ref = resolve_response_schema(oss_responses)
+    cloud_response_ref = resolve_response_schema(cloud_responses)
+
+    if not oss_response_ref:
+        return  # no response schema to compare
+
+    if not cloud_response_ref:
+        pytest.fail(
+            f"OSS endpoint {endpoint} has a response schema but Cloud endpoint "
+            f"{cloud_endpoint} does not"
+        )
+
+    oss_response_schema = lookup_schema_ref(oss_schema, oss_response_ref) or {}
+    cloud_response_schema = lookup_schema_ref(cloud_schema, cloud_response_ref) or {}
+
+    oss_props = get_schema_properties_recursive(oss_response_schema, oss_schema)
+    cloud_props = get_schema_properties_recursive(cloud_response_schema, cloud_schema)
+
+    missing_in_cloud = set(oss_props.keys()) - set(cloud_props.keys())
+
+    if missing_in_cloud:
+        pytest.fail(
+            f"Cloud response for {method.upper()} {cloud_endpoint} is missing "
+            f"properties that OSS has: {sorted(missing_in_cloud)}"
+        )
+
+
 @pytest.mark.parametrize(
     "oss_name_and_type", OSS_TYPES, ids=[name for (name, _) in OSS_TYPES]
 )
