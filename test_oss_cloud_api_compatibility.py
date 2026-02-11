@@ -58,6 +58,9 @@ FORWARD_COMPATIBLE_OSS_API_TYPE_PROPS = {
     "DeploymentCreate": ["job_variables"],
     "DeploymentUpdate": ["job_variables"],
     "DeploymentResponse": ["job_variables"],
+    # Pydantic v2 ValidationError includes extra optional fields not present in
+    # Cloud's schema yet.
+    "ValidationError": ["ctx", "input", "url"],
 }
 
 # Properties for endpoints that are known to be incompatible between OSS and Cloud
