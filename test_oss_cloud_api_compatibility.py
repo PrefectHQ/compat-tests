@@ -58,8 +58,10 @@ FORWARD_COMPATIBLE_OSS_API_TYPE_PROPS = {
     "DeploymentCreate": ["job_variables"],
     "DeploymentUpdate": ["job_variables"],
     "DeploymentResponse": ["job_variables"],
-    # Pydantic v2 ValidationError includes extra optional fields not present in
-    # Cloud's schema yet.
+    # ValidationError schema drift: Cloud pins FastAPI 0.121.0 + pydantic 2.12.2,
+    # while OSS in this suite is generated from prefect@main (currently FastAPI
+    # 0.128.x + pydantic 2.12.5). The newer OSS stack emits extra optional
+    # ValidationError fields (ctx/input/url) not present in Cloud's schema.
     "ValidationError": ["ctx", "input", "url"],
 }
 
