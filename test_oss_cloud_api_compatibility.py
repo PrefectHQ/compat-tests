@@ -38,18 +38,18 @@ def load_schema(fpath: str, key: str = None):
 
 OSS_PATH_IGNORE_REGEXES = {
     # CSRF protection is OSS only.
-    re.compile(r"^/api/csrf-token$"),
+    re.compile(r"^(/api)?/csrf-token$"),
     # avoid experimental routes to allow for fast iterations
     re.compile(r".*experimental.*"),
     # ignore the UI routes because OSS has it's own distinct UI
-    re.compile(r"^/api/ui.*"),
+    re.compile(r"^(/api)?/ui.*"),
 }
 
 # OSS has support for some request properties that are not yet in Cloud, but
 # that are forward compatible.
 FORWARD_COMPATIBLE_OSS_REQUEST_PROPS = {
-    "/api/deployments/": ["job_variables"],
-    "/api/deployments/{id}": ["job_variables"],
+    "/deployments/": ["job_variables"],
+    "/deployments/{id}": ["job_variables"],
 }
 
 # OSS has support for some properties in its API types that are not yet in
@@ -65,7 +65,7 @@ FORWARD_COMPATIBLE_OSS_API_TYPE_PROPS = {
 # The format is endpoint:method:field:<set of properties to ignore>
 # options are: "name", "types", "format", "default", "deprecated"
 KNOWN_INCOMPATIBLE_API_REQUEST_PROPS = {
-    "/api/deployments/": {
+    "/deployments/": {
         "post": {
             "enforce_parameter_schema": {"default"},
         }
@@ -104,14 +104,50 @@ def lookup_schema_ref(schema, ref):
     return schema
 
 
-def convert_oss_endpoint_to_cloud(endpoint):
-    # Collections endpoint is not nested under accounts and workspaces in Cloud
-    if endpoint == "/api/collections/views/{view}":
-        return endpoint
-    endpoint = endpoint.replace(
-        "api", "api/accounts/{account_id}/workspaces/{workspace_id}"
-    )
+def normalize_oss_endpoint(endpoint: str) -> str:
+    if endpoint.startswith("/api/"):
+        return endpoint[4:]
     return endpoint
+
+
+def convert_oss_endpoint_to_cloud(endpoint: str) -> str:
+    normalized_endpoint = normalize_oss_endpoint(endpoint)
+
+    # Collections endpoint is not nested under accounts and workspaces in Cloud
+    if normalized_endpoint == "/collections/views/{view}":
+        return f"/api{normalized_endpoint}"
+
+    return (
+        f"/api/accounts/{{account_id}}/workspaces/{{workspace_id}}"
+        f"{normalized_endpoint}"
+    )
+
+
+@pytest.mark.parametrize(
+    "oss_endpoint,expected_cloud_endpoint",
+    [
+        (
+            "/api/flow_runs/",
+            "/api/accounts/{account_id}/workspaces/{workspace_id}/flow_runs/",
+        ),
+        (
+            "/flow_runs/",
+            "/api/accounts/{account_id}/workspaces/{workspace_id}/flow_runs/",
+        ),
+        (
+            "/api/collections/views/{view}",
+            "/api/collections/views/{view}",
+        ),
+        (
+            "/collections/views/{view}",
+            "/api/collections/views/{view}",
+        ),
+    ],
+)
+def test_convert_oss_endpoint_to_cloud_handles_api_prefix_changes(
+    oss_endpoint, expected_cloud_endpoint
+):
+    assert convert_oss_endpoint_to_cloud(oss_endpoint) == expected_cloud_endpoint
 
 
 def lookup_content_body_schema(body: dict[str, Any]) -> dict[str, Any] | None:
@@ -224,6 +260,7 @@ def test_api_request_bodies_are_compatible(oss_path, oss_schema, cloud_schema):
     cloud_paths = cloud_schema["paths"]
 
     method, endpoint, path = oss_path
+    normalized_endpoint = normalize_oss_endpoint(endpoint)
     cloud_endpoint = convert_oss_endpoint_to_cloud(endpoint)
 
     if cloud_endpoint not in cloud_paths:
@@ -292,7 +329,8 @@ def test_api_request_bodies_are_compatible(oss_path, oss_schema, cloud_schema):
         {
             name: prop_gettr(name, d)
             for name, d in oss_ref_schema["properties"].items()
-            if name not in FORWARD_COMPATIBLE_OSS_REQUEST_PROPS.get(endpoint, [])
+            if name
+            not in FORWARD_COMPATIBLE_OSS_REQUEST_PROPS.get(normalized_endpoint, [])
         },
     )
 
@@ -339,7 +377,7 @@ def test_api_request_bodies_are_compatible(oss_path, oss_schema, cloud_schema):
         oss_types.discard("null")
 
         known_incompatible_props = (
-            KNOWN_INCOMPATIBLE_API_REQUEST_PROPS.get(endpoint, {})
+            KNOWN_INCOMPATIBLE_API_REQUEST_PROPS.get(normalized_endpoint, {})
             .get(method, {})
             .get(oss_name, set())
         )
