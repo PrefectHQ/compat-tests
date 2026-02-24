@@ -43,6 +43,8 @@ OSS_PATH_IGNORE_REGEXES = {
     re.compile(r".*experimental.*"),
     # ignore the UI routes because OSS has it's own distinct UI
     re.compile(r"^(/api)?/ui.*"),
+    # task_run_states API permanently returns 410 Gone in Cloud (CLOUD-3414)
+    re.compile(r"^(/api)?/task_run_states.*"),
 }
 
 # OSS has support for some request properties that are not yet in Cloud, but
