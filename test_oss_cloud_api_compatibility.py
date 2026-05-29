@@ -359,9 +359,7 @@ def test_api_request_bodies_are_compatible(oss_path, oss_schema, cloud_schema):
         # failures when looping over fields
         print("parameter name:", oss_name)
 
-        if oss_name == "history_interval_seconds":
-            oss_name = "history_interval"  # cloud aliases this which doesn't appear in the schema
-        elif oss_name == "schema" and PREFECT_V2:
+        if oss_name == "schema" and PREFECT_V2:
             oss_name = "json_schema"  # UI schema validation doesnt really matter for 2.x OSS compat
 
         assert oss_name in cloud_props[1]
