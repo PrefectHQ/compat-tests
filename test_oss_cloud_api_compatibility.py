@@ -45,6 +45,8 @@ OSS_PATH_IGNORE_REGEXES = {
     re.compile(r"^(/api)?/ui.*"),
     # task_run_states API permanently returns 410 Gone in Cloud (CLOUD-3414)
     re.compile(r"^(/api)?/task_run_states.*"),
+    # Cloud does not track task workers, so it has no task_workers API
+    re.compile(r"^(/api)?/task_workers.*"),
 }
 
 # OSS has support for some request properties that are not yet in Cloud, but
